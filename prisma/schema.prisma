@@ -152,6 +152,7 @@ model Product {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   lines           SalesOrderLine[]
+  invoiceLines    InvoiceLine[]
 }
 
 model TaxRate {
@@ -334,6 +335,7 @@ model Account {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   journal    JournalLine[]
+  products   Product[]
 
   @@unique([orgId, code])
 }
