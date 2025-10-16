@@ -1,0 +1,375 @@
+{
+  "organization": {
+    "id": "org_demo",
+    "name": "Simplebooks Demo",
+    "locale": "da-DK",
+    "baseCurrency": "DKK",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "invoiceSequences": {
+      "2024": 2
+    },
+    "billSequences": {
+      "2024": 2
+    },
+    "salesOrderSequences": {
+      "2024": 2
+    }
+  },
+  "counters": {
+    "customer": 1,
+    "vendor": 1,
+    "product": 1,
+    "taxRate": 0,
+    "salesOrder": 1,
+    "salesOrderLine": 1,
+    "invoice": 1,
+    "invoiceLine": 1,
+    "bill": 1,
+    "billLine": 1,
+    "payment": 2,
+    "journalEntry": 4,
+    "journalLine": 10
+  },
+  "customers": [
+    {
+      "id": "cus_1",
+      "name": "Aging Test Customer",
+      "email": null,
+      "phone": null,
+      "billingAddress": {},
+      "shippingAddress": {},
+      "vatNumber": null,
+      "notes": null,
+      "isArchived": false,
+      "createdAt": "2025-10-16T13:00:26.307Z",
+      "updatedAt": "2025-10-16T13:00:26.307Z"
+    }
+  ],
+  "vendors": [
+    {
+      "id": "ven_1",
+      "name": "Aging Vendor",
+      "email": null,
+      "phone": null,
+      "billingAddress": {},
+      "shippingAddress": {},
+      "vatNumber": null,
+      "notes": null,
+      "isArchived": false,
+      "createdAt": "2025-10-16T13:00:26.311Z",
+      "updatedAt": "2025-10-16T13:00:26.311Z"
+    }
+  ],
+  "products": [
+    {
+      "id": "prod_1",
+      "sku": null,
+      "name": "Service",
+      "description": null,
+      "unitPriceNet": 5000,
+      "incomeAccountId": "acct_sales",
+      "isService": true,
+      "taxRateId": "tax_default",
+      "isActive": true,
+      "createdAt": "2025-10-16T13:00:26.307Z",
+      "updatedAt": "2025-10-16T13:00:26.307Z"
+    }
+  ],
+  "taxRates": [
+    {
+      "id": "tax_default",
+      "name": "Standard VAT 25%",
+      "ratePercent": 25,
+      "isActive": true,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "accounts": [
+    {
+      "id": "acct_bank",
+      "code": "1010",
+      "name": "Bank",
+      "type": "asset",
+      "isSystem": true,
+      "isActive": true
+    },
+    {
+      "id": "acct_ar",
+      "code": "1100",
+      "name": "Accounts Receivable",
+      "type": "asset",
+      "isSystem": true,
+      "isActive": true
+    },
+    {
+      "id": "acct_ap",
+      "code": "2100",
+      "name": "Accounts Payable",
+      "type": "liability",
+      "isSystem": true,
+      "isActive": true
+    },
+    {
+      "id": "acct_output_vat",
+      "code": "2610",
+      "name": "Output VAT",
+      "type": "liability",
+      "isSystem": true,
+      "isActive": true
+    },
+    {
+      "id": "acct_equity",
+      "code": "3000",
+      "name": "Equity",
+      "type": "equity",
+      "isSystem": true,
+      "isActive": true
+    },
+    {
+      "id": "acct_sales",
+      "code": "4000",
+      "name": "Sales",
+      "type": "income",
+      "isSystem": true,
+      "isActive": true
+    },
+    {
+      "id": "acct_office_expense",
+      "code": "5300",
+      "name": "Office Expenses",
+      "type": "expense",
+      "isSystem": true,
+      "isActive": true
+    },
+    {
+      "id": "acct_input_vat",
+      "code": "5710",
+      "name": "Input VAT",
+      "type": "asset",
+      "isSystem": true,
+      "isActive": true
+    }
+  ],
+  "salesOrders": [
+    {
+      "id": "so_1",
+      "sales_order_no": "SO-2024-0001",
+      "customer_id": "cus_1",
+      "status": "invoiced",
+      "issue_date": "2024-02-01T00:00:00.000Z",
+      "due_date": "2024-02-10T00:00:00.000Z",
+      "currency": "DKK",
+      "notes": null,
+      "totals_cache": {
+        "subtotal": 5000,
+        "taxTotal": 1250,
+        "total": 6250
+      },
+      "lines": [
+        {
+          "id": "sol_1",
+          "productId": "prod_1",
+          "description": "Service",
+          "qty": 1,
+          "unit_price_net": 5000,
+          "discount_amount": 0,
+          "tax_rate_percent_snapshot": 25,
+          "account_id_snapshot": "acct_sales"
+        }
+      ]
+    }
+  ],
+  "invoices": [
+    {
+      "id": "inv_1",
+      "invoice_no": "INV-2024-0001",
+      "customer_id": "cus_1",
+      "sales_order_id": "so_1",
+      "status": "partially_paid",
+      "issue_date": "2024-02-01T00:00:00.000Z",
+      "due_date": "2024-02-10T00:00:00.000Z",
+      "currency": "DKK",
+      "subtotal": 5000,
+      "tax_total": 1250,
+      "total": 6250,
+      "balance": 3750,
+      "created_at": "2025-10-16T13:00:26.309Z",
+      "updated_at": "2025-10-16T13:00:26.310Z",
+      "lines": [
+        {
+          "id": "invline_1",
+          "product_id": "prod_1",
+          "description": "Service",
+          "qty": 1,
+          "unit_price_net": 5000,
+          "discount_amount": 0,
+          "tax_rate_percent_snapshot": 25,
+          "account_id_snapshot": "acct_sales"
+        }
+      ],
+      "payments": [
+        {
+          "payment_id": "pay_1",
+          "amount": 2500
+        }
+      ],
+      "issued_at": "2025-10-16T13:00:26.309Z"
+    }
+  ],
+  "bills": [
+    {
+      "id": "bill_1",
+      "bill_no": "BILL-2024-0001",
+      "vendor_id": "ven_1",
+      "status": "partially_paid",
+      "issue_date": "2024-02-05T00:00:00.000Z",
+      "due_date": "2024-02-18T00:00:00.000Z",
+      "currency": "DKK",
+      "subtotal": 4000,
+      "tax_total": 1000,
+      "total": 5000,
+      "balance": 3000,
+      "created_at": "2025-10-16T13:00:26.319Z",
+      "updated_at": "2025-10-16T13:00:26.344Z",
+      "lines": [
+        {
+          "id": "billline_1",
+          "description": "Supplies",
+          "qty": 1,
+          "unit_price_net": 4000,
+          "discount_amount": 0,
+          "tax_rate_percent_snapshot": 25,
+          "account_id_snapshot": "acct_office_expense"
+        }
+      ],
+      "payments": [
+        {
+          "payment_id": "pay_2",
+          "amount": 2000
+        }
+      ],
+      "approved_at": "2025-10-16T13:00:26.343Z"
+    }
+  ],
+  "payments": [
+    {
+      "id": "pay_1",
+      "type": "AR",
+      "method": "bank_transfer",
+      "amount": 2500,
+      "date": "2024-02-15T00:00:00.000Z",
+      "reference": null,
+      "customer_id": "cus_1",
+      "vendor_id": null
+    },
+    {
+      "id": "pay_2",
+      "type": "AP",
+      "method": "bank_transfer",
+      "amount": 2000,
+      "date": "2024-02-20T00:00:00.000Z",
+      "reference": null,
+      "customer_id": null,
+      "vendor_id": "ven_1"
+    }
+  ],
+  "journalEntries": [
+    {
+      "id": "je_1",
+      "date": "2024-02-01T00:00:00.000Z",
+      "memo": "Issue invoice INV-2024-0001",
+      "source": "invoice_issue",
+      "sourceId": "inv_1",
+      "lines": [
+        {
+          "id": "jl_1",
+          "accountId": "acct_ar",
+          "debit": 6250,
+          "credit": 0
+        },
+        {
+          "id": "jl_2",
+          "accountId": "acct_sales",
+          "debit": 0,
+          "credit": 5000
+        },
+        {
+          "id": "jl_3",
+          "accountId": "acct_output_vat",
+          "debit": 0,
+          "credit": 1250
+        }
+      ]
+    },
+    {
+      "id": "je_2",
+      "date": "2024-02-15T00:00:00.000Z",
+      "memo": "Payment for invoice INV-2024-0001",
+      "source": "invoice_payment",
+      "sourceId": "inv_1",
+      "lines": [
+        {
+          "id": "jl_4",
+          "accountId": "acct_bank",
+          "debit": 2500,
+          "credit": 0
+        },
+        {
+          "id": "jl_5",
+          "accountId": "acct_ar",
+          "debit": 0,
+          "credit": 2500
+        }
+      ]
+    },
+    {
+      "id": "je_3",
+      "date": "2024-02-05T00:00:00.000Z",
+      "memo": "Approve bill BILL-2024-0001",
+      "source": "bill_approve",
+      "sourceId": "bill_1",
+      "lines": [
+        {
+          "id": "jl_6",
+          "accountId": "acct_ap",
+          "debit": 0,
+          "credit": 5000
+        },
+        {
+          "id": "jl_7",
+          "accountId": "acct_office_expense",
+          "debit": 4000,
+          "credit": 0
+        },
+        {
+          "id": "jl_8",
+          "accountId": "acct_input_vat",
+          "debit": 1000,
+          "credit": 0
+        }
+      ]
+    },
+    {
+      "id": "je_4",
+      "date": "2024-02-20T00:00:00.000Z",
+      "memo": "Payment for bill BILL-2024-0001",
+      "source": "bill_payment",
+      "sourceId": "bill_1",
+      "lines": [
+        {
+          "id": "jl_9",
+          "accountId": "acct_ap",
+          "debit": 2000,
+          "credit": 0
+        },
+        {
+          "id": "jl_10",
+          "accountId": "acct_bank",
+          "debit": 0,
+          "credit": 2000
+        }
+      ]
+    }
+  ]
+}

@@ -1,18 +1,9 @@
 {
   "name": "clouderp-simplebooks",
   "private": true,
-  "workspaces": [
-    "apps/api",
-    "apps/web"
-  ],
+  "type": "module",
   "scripts": {
-    "build": "npm run --workspaces --if-present build",
-    "lint": "npm run --workspaces --if-present lint",
-    "test": "npm run --workspaces --if-present test",
-    "dev:api": "npm run --workspace apps/api dev",
-    "dev:web": "npm run --workspace apps/web dev",
-    "prisma:migrate": "npm run --workspace apps/api prisma:migrate",
-    "prisma:generate": "npm run --workspace apps/api prisma:generate",
-    "prisma:seed": "npm run --workspace apps/api prisma:seed"
+    "start": "node apps/api/src/server.js",
+    "test": "node --test"
   }
 }
