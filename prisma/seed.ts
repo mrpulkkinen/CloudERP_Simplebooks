@@ -1,4 +1,4 @@
-import { PrismaClient, AccountType } from '@prisma/client';
+import { PrismaClient, Prisma, AccountType } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -67,7 +67,7 @@ async function main() {
       id: 'vat-25',
       orgId: org.id,
       name: 'VAT 25%',
-      rate: 25
+      rate: new Prisma.Decimal('25.00')
     }
   });
 
