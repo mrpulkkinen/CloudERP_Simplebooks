@@ -38,6 +38,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     environment:
+      INTERNAL_API_URL: http://api:5010
       NEXT_PUBLIC_API_URL: http://api:5010
     depends_on:
       - api

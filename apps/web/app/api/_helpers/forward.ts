@@ -1,21 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_BASE_URL =
-  process.env.INTERNAL_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  'http://localhost:5010';
+import { getInternalApiUrl } from '../../../lib/config';
 
 export async function forwardJson(request: NextRequest, path: string) {
   try {
-    const bodyText = await request.text();
+    const baseUrl = getInternalApiUrl();
+    const targetUrl = new URL(path, baseUrl);
+    if (request.nextUrl.search) {
+      targetUrl.search = request.nextUrl.search;
+    }
+    const method = request.method.toUpperCase();
+    const headers = new Headers(request.headers);
+    headers.delete('host');
+    headers.delete('content-length');
 
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      method: request.method,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: bodyText,
-      cache: 'no-store'
+    if (!headers.has('accept')) {
+      headers.set('accept', 'application/json');
+    }
+
+    if (method === 'GET' || method === 'HEAD') {
+      headers.delete('content-type');
+    } else if (!headers.has('content-type')) {
+      headers.set('content-type', 'application/json');
+    }
+
+    const bodyText = method === 'GET' || method === 'HEAD' ? undefined : await request.text();
+
+    const response = await fetch(targetUrl, {
+      method,
+      headers,
+      body: bodyText?.length ? bodyText : undefined,
+      cache: 'no-store',
+      redirect: 'manual'
     });
 
     const responseText = await response.text();
