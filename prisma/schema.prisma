@@ -1,0 +1,364 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  CONFIRMED
+  INVOICED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum BillStatus {
+  DRAFT
+  APPROVED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum PaymentType {
+  AR
+  AP
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CARD
+  OTHER
+}
+
+enum JournalSource {
+  MANUAL
+  SALES_ORDER
+  INVOICE
+  BILL
+  PAYMENT
+  VOID
+}
+
+model Organization {
+  id           String           @id @default(cuid())
+  name         String
+  locale       String           @default("da-DK")
+  baseCurrency String           @default("DKK")
+  createdAt    DateTime         @default(now())
+  customers    Customer[]
+  vendors      Vendor[]
+  products     Product[]
+  taxRates     TaxRate[]
+  salesOrders  SalesOrder[]
+  invoices     Invoice[]
+  bills        Bill[]
+  payments     Payment[]
+  accounts     Account[]
+  journal      JournalEntry[]
+  users        UserOrganization[]
+}
+
+model User {
+  id        String               @id @default(cuid())
+  email     String               @unique
+  password  String
+  name      String
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  orgs      UserOrganization[]
+}
+
+model UserOrganization {
+  id     String        @id @default(cuid())
+  role   String        @default("owner")
+  user   User          @relation(fields: [userId], references: [id])
+  userId String
+  org    Organization  @relation(fields: [orgId], references: [id])
+  orgId  String
+
+  @@unique([userId, orgId])
+}
+
+model Customer {
+  id              String        @id @default(cuid())
+  org             Organization  @relation(fields: [orgId], references: [id])
+  orgId           String
+  name            String
+  email           String?
+  phone           String?
+  billingAddress  Json?
+  shippingAddress Json?
+  vatNumber       String?
+  notes           String?
+  isArchived      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  salesOrders     SalesOrder[]
+  invoices        Invoice[]
+  payments        Payment[]
+}
+
+model Vendor {
+  id              String        @id @default(cuid())
+  org             Organization  @relation(fields: [orgId], references: [id])
+  orgId           String
+  name            String
+  email           String?
+  phone           String?
+  billingAddress  Json?
+  shippingAddress Json?
+  vatNumber       String?
+  notes           String?
+  isArchived      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  bills           Bill[]
+  payments        Payment[]
+}
+
+model Product {
+  id              String        @id @default(cuid())
+  org             Organization  @relation(fields: [orgId], references: [id])
+  orgId           String
+  sku             String        @unique
+  name            String
+  description     String?
+  unitPriceNet    Int
+  incomeAccount   Account       @relation(fields: [incomeAccountId], references: [id])
+  incomeAccountId String
+  taxRate         TaxRate?      @relation(fields: [taxRateId], references: [id])
+  taxRateId       String?
+  isService       Boolean       @default(true)
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  lines           SalesOrderLine[]
+  invoiceLines    InvoiceLine[]
+}
+
+model TaxRate {
+  id        String        @id @default(cuid())
+  org       Organization  @relation(fields: [orgId], references: [id])
+  orgId     String
+  name      String
+  rate      Decimal       @db.Decimal(5, 2)
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  products  Product[]
+  soLines   SalesOrderLine[]
+  invoiceLines InvoiceLine[]
+  billLines BillLine[]
+}
+
+model SalesOrder {
+  id          String           @id @default(cuid())
+  org         Organization     @relation(fields: [orgId], references: [id])
+  orgId       String
+  customer    Customer         @relation(fields: [customerId], references: [id])
+  customerId  String
+  status      SalesOrderStatus @default(DRAFT)
+  orderNo     String
+  issueDate   DateTime
+  dueDate     DateTime
+  currency    String           @default("DKK")
+  notes       String?
+  totalsCache Json?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  lines       SalesOrderLine[]
+  invoices    Invoice[]
+
+  @@unique([orgId, orderNo])
+}
+
+model SalesOrderLine {
+  id                    String      @id @default(cuid())
+  salesOrder            SalesOrder  @relation(fields: [salesOrderId], references: [id])
+  salesOrderId          String
+  product               Product?    @relation(fields: [productId], references: [id])
+  productId             String?
+  description           String
+  quantity              Decimal     @db.Decimal(10, 2)
+  unitPriceNet          Int
+  discountAmount        Int         @default(0)
+  taxRate               TaxRate?    @relation(fields: [taxRateId], references: [id])
+  taxRateId             String?
+  accountSnapshotId     String?
+  taxRatePercentSnapshot Decimal?   @db.Decimal(5, 2)
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  org           Organization  @relation(fields: [orgId], references: [id])
+  orgId         String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  customerId    String
+  salesOrder    SalesOrder?   @relation(fields: [salesOrderId], references: [id])
+  salesOrderId  String?
+  status        InvoiceStatus @default(DRAFT)
+  invoiceNo     String
+  issueDate     DateTime
+  dueDate       DateTime
+  currency      String         @default("DKK")
+  subtotal      Int            @default(0)
+  taxTotal      Int            @default(0)
+  total         Int            @default(0)
+  balance       Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lines         InvoiceLine[]
+  payments      InvoicePayment[]
+
+  @@unique([orgId, invoiceNo])
+}
+
+model InvoiceLine {
+  id                String    @id @default(cuid())
+  invoice           Invoice   @relation(fields: [invoiceId], references: [id])
+  invoiceId         String
+  product           Product?  @relation(fields: [productId], references: [id])
+  productId         String?
+  description       String
+  quantity          Decimal   @db.Decimal(10, 2)
+  unitPriceNet      Int
+  discountAmount    Int       @default(0)
+  taxRate           TaxRate?  @relation(fields: [taxRateId], references: [id])
+  taxRateId         String?
+  accountSnapshotId String?
+  taxRatePercentSnapshot Decimal? @db.Decimal(5, 2)
+}
+
+model Bill {
+  id           String      @id @default(cuid())
+  org          Organization @relation(fields: [orgId], references: [id])
+  orgId        String
+  vendor       Vendor      @relation(fields: [vendorId], references: [id])
+  vendorId     String
+  status       BillStatus  @default(DRAFT)
+  billNo       String
+  issueDate    DateTime
+  dueDate      DateTime
+  currency     String      @default("DKK")
+  subtotal     Int         @default(0)
+  taxTotal     Int         @default(0)
+  total        Int         @default(0)
+  balance      Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  lines        BillLine[]
+  payments     BillPayment[]
+
+  @@unique([orgId, billNo])
+}
+
+model BillLine {
+  id                String   @id @default(cuid())
+  bill              Bill     @relation(fields: [billId], references: [id])
+  billId            String
+  description       String
+  quantity          Decimal  @db.Decimal(10, 2)
+  unitPriceNet      Int
+  taxRate           TaxRate? @relation(fields: [taxRateId], references: [id])
+  taxRateId         String?
+  accountSnapshotId String?
+  taxRatePercentSnapshot Decimal? @db.Decimal(5, 2)
+}
+
+model Payment {
+  id         String       @id @default(cuid())
+  org        Organization @relation(fields: [orgId], references: [id])
+  orgId      String
+  type       PaymentType
+  method     PaymentMethod
+  amount     Int
+  date       DateTime
+  reference  String?
+  customer   Customer?    @relation(fields: [customerId], references: [id])
+  customerId String?
+  vendor     Vendor?      @relation(fields: [vendorId], references: [id])
+  vendorId   String?
+  invoices   InvoicePayment[]
+  bills      BillPayment[]
+}
+
+model InvoicePayment {
+  id         String   @id @default(cuid())
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id])
+  invoiceId  String
+  payment    Payment  @relation(fields: [paymentId], references: [id])
+  paymentId  String
+  amount     Int
+
+  @@unique([invoiceId, paymentId])
+}
+
+model BillPayment {
+  id        String  @id @default(cuid())
+  bill      Bill    @relation(fields: [billId], references: [id])
+  billId    String
+  payment   Payment @relation(fields: [paymentId], references: [id])
+  paymentId String
+  amount    Int
+
+  @@unique([billId, paymentId])
+}
+
+model Account {
+  id         String        @id @default(cuid())
+  org        Organization  @relation(fields: [orgId], references: [id])
+  orgId      String
+  code       String
+  name       String
+  type       AccountType
+  isSystem   Boolean       @default(false)
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  journal    JournalLine[]
+  products   Product[]
+
+  @@unique([orgId, code])
+}
+
+model JournalEntry {
+  id        String        @id @default(cuid())
+  org       Organization  @relation(fields: [orgId], references: [id])
+  orgId     String
+  date      DateTime
+  memo      String?
+  source    JournalSource
+  sourceId  String?
+  createdAt DateTime       @default(now())
+  lines     JournalLine[]
+}
+
+model JournalLine {
+  id            String        @id @default(cuid())
+  entry         JournalEntry  @relation(fields: [journalEntryId], references: [id])
+  journalEntryId String
+  account       Account       @relation(fields: [accountId], references: [id])
+  accountId     String
+  debit         Int           @default(0)
+  credit        Int           @default(0)
+}
+
