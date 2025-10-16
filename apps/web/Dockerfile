@@ -14,4 +14,4 @@ RUN npm run build --workspace apps/web
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start", "--workspace", "apps/web"]
+CMD ["node", "apps/web/.next/standalone/server.js"]
