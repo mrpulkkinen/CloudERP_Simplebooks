@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 
 import { formatDKK } from '../lib/money';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5010';
-
 interface CustomerOption {
   id: string;
   name: string;
@@ -106,35 +104,41 @@ export function NewInvoiceForm({ customers }: { customers: CustomerOption[] }) {
 
     const unitPriceNet = Math.round(unitPrice * 100);
 
-    const response = await fetch(`${API_URL}/invoices`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        customerId: form.customerId,
-        issueDate: form.issueDate,
-        dueDate: form.dueDate,
-        currency: 'DKK',
-        lines: [
-          {
-            description: form.description.trim(),
-            quantity,
-            unitPriceNet
-          }
-        ]
-      })
-    });
+    try {
+      const response = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customerId: form.customerId,
+          issueDate: form.issueDate,
+          dueDate: form.dueDate,
+          currency: 'DKK',
+          lines: [
+            {
+              description: form.description.trim(),
+              quantity,
+              unitPriceNet
+            }
+          ]
+        })
+      });
 
-    if (!response.ok) {
-      let message = 'Failed to create invoice';
-      try {
-        const body = await response.json();
-        message = body?.error?.message ?? message;
-      } catch (parseError) {
-        console.error('Failed to parse error response', parseError);
+      if (!response.ok) {
+        let message = 'Failed to create invoice';
+        try {
+          const body = await response.json();
+          message = body?.error?.message ?? message;
+        } catch (parseError) {
+          console.error('Failed to parse error response', parseError);
+        }
+        setError(message);
+        return;
       }
-      setError(message);
+    } catch (networkError) {
+      console.error('Failed to submit invoice form', networkError);
+      setError('Unable to reach the API. Please try again.');
       return;
     }
 

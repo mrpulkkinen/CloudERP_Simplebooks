@@ -3,8 +3,6 @@
 import { FormEvent, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5010';
-
 interface FormState {
   name: string;
   email: string;
@@ -40,29 +38,35 @@ export function NewCustomerForm() {
       return;
     }
 
-    const response = await fetch(`${API_URL}/customers`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: form.name.trim(),
-        email: form.email.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        vatNumber: form.vatNumber.trim() || undefined,
-        notes: form.notes.trim() || undefined
-      })
-    });
+    try {
+      const response = await fetch('/api/customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+          vatNumber: form.vatNumber.trim() || undefined,
+          notes: form.notes.trim() || undefined
+        })
+      });
 
-    if (!response.ok) {
-      let message = 'Failed to create customer';
-      try {
-        const body = await response.json();
-        message = body?.error?.message ?? message;
-      } catch (parseError) {
-        console.error('Failed to parse error response', parseError);
+      if (!response.ok) {
+        let message = 'Failed to create customer';
+        try {
+          const body = await response.json();
+          message = body?.error?.message ?? message;
+        } catch (parseError) {
+          console.error('Failed to parse error response', parseError);
+        }
+        setError(message);
+        return;
       }
-      setError(message);
+    } catch (networkError) {
+      console.error('Failed to submit customer form', networkError);
+      setError('Unable to reach the API. Please try again.');
       return;
     }
 
