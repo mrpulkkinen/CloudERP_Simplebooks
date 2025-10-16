@@ -1,5 +1,4 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { InvoiceStatus, Prisma } from '@prisma/client';
 import { ZodError, z } from 'zod';
 
 import { prisma } from '../services/prisma.js';
@@ -47,8 +46,8 @@ const createInvoiceSchema = z
 
 function calculateSubtotal(lines: Array<{ quantity: number; unitPriceNet: number }>): number {
   return lines.reduce((total, line) => {
-    const lineTotal = new Prisma.Decimal(line.quantity).mul(line.unitPriceNet);
-    return total + Number(lineTotal.toFixed(0));
+    const lineTotal = Math.round(line.quantity * line.unitPriceNet);
+    return total + lineTotal;
   }, 0);
 }
 
@@ -93,7 +92,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         issueDate: new Date(payload.issueDate),
         dueDate: new Date(payload.dueDate),
         currency: payload.currency,
-        status: InvoiceStatus.ISSUED,
+        status: 'ISSUED',
         subtotal,
         taxTotal: 0,
         total: subtotal,
@@ -101,7 +100,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         lines: {
           create: payload.lines.map((line) => ({
             description: line.description,
-            quantity: new Prisma.Decimal(line.quantity),
+            quantity: line.quantity,
             unitPriceNet: line.unitPriceNet,
             taxRateId: line.taxRateId
           }))
