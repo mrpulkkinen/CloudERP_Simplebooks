@@ -1,111 +1,130 @@
-# CloudERP Simplebooks MVP Requirements
+# CloudERP Simplebooks Requirements
 
-This document captures the minimum viable product scope for CloudERP Simplebooks. It consolidates the high-level goals, architecture decisions, functional requirements, and acceptance criteria provided by product management.
+This document captures the MVP scope for the CloudERP Simplebooks project. It
+covers the product goals, architecture, functional requirements, and
+acceptance criteria that guide implementation. Refer to it when extending the
+system to ensure alignment with the agreed-upon MVP.
 
 ## 1. Product Summary
 
-- Lightweight accounting app inspired by Billy and Dinero.
-- Focused on explicit bookkeeping without automation.
-- Core workflows: master data management, sales orders, invoices, bills, manual payments, general ledger, and basic reporting.
+A lightweight accounting web application for small businesses that prefer
+explicit bookkeeping without automation. Inspired by Billy and Dinero.
 
-## 2. Non-goals (MVP)
+Core goals:
 
-- No bank feeds, OCR, or ML automations.
-- No inventory management, fulfillment, or shipping features.
-- No multi-currency or multi-entity consolidation.
-- Recurring invoices, credit notes, and purchase orders are excluded.
-- No complex approvals beyond owner role.
-- Single tax rate per line only; no advanced tax engines.
+- Customers & Vendors master data
+- Sales Orders → Invoices (Accounts Receivable)
+- Bills (Accounts Payable)
+- Manual payments (partial & full)
+- Double-entry General Ledger & Chart of Accounts
+- Basic reporting: Trial Balance, AR/AP Aging
 
-## 3. Architecture Overview
+Non-goals for the MVP:
 
-- **Frontend:** Next.js 14 (TypeScript) App Router.
-- **Backend API:** Express.js with TypeScript.
-- **Database:** PostgreSQL 16 via Prisma ORM.
-- **Auth:** Email/password with JWT stored in httpOnly cookie.
-- **Infrastructure:** Docker Compose for local development (db, api, web).
-- **Documentation:** OpenAPI 3 served by the API service.
-- **Testing:** Unit tests (Vitest/Jest), API tests (supertest), optional Playwright E2E.
+- Automated bank feeds, OCR, reconciliation
+- Inventory, fulfillment, shipping
+- Multi-currency or multi-entity consolidation
+- Recurring invoices, credit notes, quotes/POs
+- Complex approvals or RBAC beyond owner
+- Tax engines or multi-tax rules (single per-line rate only)
 
-## 4. Core Functional Requirements
+## 2. Architecture Overview
 
-### 4.1 Master Data
-- Customers and Vendors: create/read/update/archive with contact info and addresses.
-- Products/Services catalog with pricing, income account, optional tax rate.
-- Tax rates with fixed percentages.
+- **Frontend:** Next.js 14 (TypeScript), App Router, server components, output
+  configured for `standalone` deployments.
+- **Backend API:** Node.js + Express + TypeScript.
+- **Database:** PostgreSQL accessed via Prisma ORM.
+- **Auth:** Email/password with JWT stored in httpOnly cookies.
+- **Infra:** Docker Compose for local development (db, api, web services).
+- **Testing:** Unit tests with Vitest/Jest; API tests with supertest; optional
+  Playwright for E2E.
 
-### 4.2 Sales & Accounts Receivable
-- Sales orders: draft → confirmed → invoiced; convert to invoices.
-- Invoices: draft/issued/partially paid/paid/void with sequential numbering and PDF view.
-- AR payments: manual, partial/full, applied to invoices.
+### Services & Ports
 
-### 4.3 Accounts Payable
-- Bills: draft/approved/partially paid/paid/void.
-- AP payments: manual, partial/full, applied to bills.
+- `db`: PostgreSQL 16 (5432)
+- `api`: Express API (5010)
+- `web`: Next.js application (3000)
 
-### 4.4 Ledger & Reporting
-- Double-entry general ledger with pre-seeded chart of accounts.
-- Posting rules for issuing invoices, recording payments, approving bills, voiding documents, and manual journals.
-- Reports: dashboard metrics, trial balance, AR/AP aging.
+### Repository Layout
 
-## 5. API Surface (REST)
+```
+/
+├─ apps/
+│  ├─ api/                     # Express + Prisma
+│  └─ web/                     # Next.js (SSR/SPA)
+├─ prisma/
+│  ├─ schema.prisma
+│  └─ seed.ts
+├─ docker-compose.yml
+├─ README.md
+└─ REQUIREMENTS.md
+```
 
-- Auth endpoints: register, login, logout, `GET /me`.
-- Master data endpoints: customers, vendors, products, tax rates.
-- Sales & AR endpoints: sales orders, invoices, payments, PDF export.
-- AP endpoints: bills, payments.
-- Ledger & reports endpoints: journals, ledger listing, trial balance, AR/AP aging.
+## 3. Functional Requirements (Highlights)
 
-## 6. Data Model (Prisma)
+- CRUD for Customers, Vendors, Products/Services, Tax Rates
+- Sales Orders that convert to Invoices
+- Invoices with sequential numbering, manual payments, PDF view
+- Bills with approval workflow and payments
+- Payments that post to AR/AP and Bank accounts
+- Chart of Accounts with double-entry Journal entries
+- Posting rules for issuing/voiding invoices, approving bills, and payments
+- Reports: Dashboard metrics, Trial Balance, AR/AP Aging
 
-- Entities for organizations, users, customers, vendors, products, tax rates, sales orders, invoices, bills, payments, accounts, journals, and junction tables for payments.
-- Unique constraints on document numbering per organization and foreign keys on all relations.
-- Timestamps on primary entities.
+## 4. Data Model (Prisma)
 
-## 7. Frontend Requirements
+Refer to `prisma/schema.prisma` for the authoritative schema covering
+organizations, users, customers, vendors, documents, payments, accounts, and
+journals. The schema enforces balance, unique numbering, and foreign keys.
 
-- Next.js App Router with server components for lists and client components for forms.
-- Uses `NEXT_PUBLIC_API_URL` for API base URL.
-- Pages for dashboard, invoices, bills, customers, vendors, products, ledger, reports, and login.
-- Minimal fetch utility with no-store caching and money formatting helper.
+## 5. API Surface
 
-## 8. Security & Compliance
+REST endpoints under `/auth`, `/customers`, `/vendors`, `/products`,
+`/tax-rates`, `/sales-orders`, `/invoices`, `/bills`, `/payments`, `/journals`,
+`/ledger`, and `/reports/*` with JSON payloads validated via Zod. Errors follow
+`{ error: { code, message, details? } }` format with HTTP 422 for validation
+failures.
 
-- JWT stored in httpOnly cookies, secure in production.
-- Passwords hashed with bcrypt.
-- Zod validation and sanitization; rate limiting on auth routes.
-- CORS restricted to web origin.
+## 6. Frontend Requirements
 
-## 9. DevEx & Infrastructure
+- Next.js App Router pages for dashboard, invoices, bills, customers, vendors,
+  products, ledger, and reports.
+- Server components for list views; lightweight client components for forms.
+- Fetch helper in `apps/web/lib/api.ts` that reads `NEXT_PUBLIC_API_URL` and
+  disables caching via `no-store`.
+- Money formatting helper for Danish Krone øre values.
 
-- Environment variables defined for API and web services.
-- Docker Compose orchestrates db/api/web containers.
-- API entrypoint runs Prisma migrations, generates client, then starts server.
+## 7. Security & Compliance
 
-## 10. Posting Rules & Testing Expectations
+- JWT in httpOnly cookies (secure in production)
+- Password hashing with bcrypt
+- Input validation with Zod
+- Rate limiting on auth routes
+- CORS restricted to the web origin
 
-- Double-entry posting for invoice issuance, AR/AP payments, bill approval, and voiding.
-- Manual journals must balance (sum debits equals sum credits).
-- Unit tests assert balanced journals and alignment between document balances and ledger balances.
+## 8. DevEx & Infrastructure
 
-## 11. Acceptance Criteria
+Environment variables:
 
-- End-to-end AR and AP flows culminating in balanced ledgers.
-- Reports: trial balance equality, accurate AR/AP aging buckets.
-- Frontend renders data lists and PDF endpoint available for issued invoices.
-- Docker Compose brings up all services; Next.js runs in standalone mode in production image.
+```
+PORT=5010
+DATABASE_URL=postgresql://postgres:postgres@db:5432/clouderp
+JWT_SECRET=change-me
+PRISMA_HIDE_UPDATE_MESSAGE=1
+PRISMA_DISABLE_TELEMETRY=1
 
-## 12. Milestones
+NEXT_PUBLIC_API_URL=http://localhost:5010
+```
 
-1. Project skeleton (current milestone).
-2. AR & AP basics.
-3. Payments & Ledger.
-4. Frontend lists & PDF.
-5. Polish & documentation.
+Docker Compose spins up Postgres, the API, and the web app. The API container
+runs migrations and seeds on boot before starting the Express server. The web
+container builds the Next.js app using the `standalone` output.
 
-## 13. Definition of Done
+## 9. Acceptance Criteria
 
-- All acceptance criteria satisfied.
-- CI runs tests, type checks, and builds Docker images.
-- README provides clear setup instructions.
-- No blocking TODOs remain.
+- End-to-end Accounts Receivable and Accounts Payable flows post balanced
+  journal entries and update document statuses.
+- Reports return balanced trial balance and accurate aging buckets.
+- Frontend renders lists sourced from the API with empty states.
+- Docker Compose bootstraps the full stack and exposes ports 3000/5010/5432.
+
