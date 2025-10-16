@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log*
+dist
+.next
+.env
+.env*
+Dockerfile.local
+coverage
+.prisma
+
+# macOS
+.DS_Store
