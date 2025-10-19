@@ -10,7 +10,8 @@ const links = [
   { href: '/vendors', label: 'Vendors' },
   { href: '/products', label: 'Products' },
   { href: '/ledger', label: 'Ledger' },
-  { href: '/reports', label: 'Reports' }
+  { href: '/reports', label: 'Reports' },
+  { href: '/license', label: 'License' }
 ];
 
 export default function RootLayout({ children }: { children: ReactNode }) {
