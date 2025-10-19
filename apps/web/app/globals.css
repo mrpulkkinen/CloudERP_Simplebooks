@@ -86,12 +86,26 @@ body {
   gap: 1rem;
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
   padding: 0.75rem;
   border-radius: 0.5rem;
   border: 1px solid #cbd5e1;
   font-size: 1rem;
+}
+
+select {
+  background-color: #fff;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+  color: #334155;
 }
 
 button {
