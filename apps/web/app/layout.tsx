@@ -6,6 +6,7 @@ const links = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/invoices', label: 'Invoices' },
   { href: '/bills', label: 'Bills' },
+  { href: '/payments', label: 'Payments' },
   { href: '/customers', label: 'Customers' },
   { href: '/vendors', label: 'Vendors' },
   { href: '/products', label: 'Products' },

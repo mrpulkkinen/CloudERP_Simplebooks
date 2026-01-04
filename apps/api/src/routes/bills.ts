@@ -9,11 +9,7 @@ import { computeLineTotals, loadTaxRateMap } from '../services/totals.js';
 const router = Router();
 const { DEFAULT_ORG_ID } = loadEnv();
 
-const isoDateSchema = z
-  .string()
-  .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Invalid date format' });
-
-const invoiceLineSchema = z.object({
+const billLineSchema = z.object({
   description: z.string().min(1, 'Description is required'),
   quantity: z.number().positive('Quantity must be greater than zero'),
   unitPriceNet: z
@@ -26,20 +22,20 @@ const invoiceLineSchema = z.object({
   accountCode: z
     .string()
     .optional()
-    .or(z.literal('').transform(() => undefined)),
-  productId: z
-    .string()
-    .optional()
     .or(z.literal('').transform(() => undefined))
 });
 
-const createInvoiceSchema = z
+const createBillSchema = z
   .object({
-    customerId: z.string().min(1, 'Customer is required'),
-    issueDate: isoDateSchema,
-    dueDate: isoDateSchema,
+    vendorId: z.string().min(1, 'Vendor is required'),
+    issueDate: z
+      .string()
+      .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Invalid date format' }),
+    dueDate: z
+      .string()
+      .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Invalid date format' }),
     currency: z.string().min(1).default('DKK'),
-    lines: z.array(invoiceLineSchema).min(1, 'At least one line is required')
+    lines: z.array(billLineSchema).min(1, 'At least one line is required')
   })
   .superRefine((data, ctx) => {
     const issueDate = new Date(data.issueDate);
@@ -54,28 +50,25 @@ const createInvoiceSchema = z
     }
   });
 
-async function getNextInvoiceNumber(client = prisma): Promise<string> {
-  const count = await client.invoice.count({ where: { orgId: DEFAULT_ORG_ID } });
+async function getNextBillNumber(client = prisma): Promise<string> {
+  const count = await client.bill.count({ where: { orgId: DEFAULT_ORG_ID } });
   const sequence = count + 1;
-  return `INV-${sequence.toString().padStart(4, '0')}`;
+  return `BILL-${sequence.toString().padStart(4, '0')}`;
 }
 
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const invoices = await prisma.invoice.findMany({
+    const bills = await prisma.bill.findMany({
       where: { orgId: DEFAULT_ORG_ID },
       orderBy: { issueDate: 'desc' },
       include: {
-        customer: {
-          select: {
-            id: true,
-            name: true
-          }
+        vendor: {
+          select: { id: true, name: true }
         }
       }
     });
 
-    res.json({ data: invoices });
+    res.json({ data: bills });
   } catch (error) {
     next(error);
   }
@@ -83,14 +76,14 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
 
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const payload = createInvoiceSchema.parse(req.body);
-    const customer = await prisma.customer.findFirst({
-      where: { id: payload.customerId, orgId: DEFAULT_ORG_ID },
+    const payload = createBillSchema.parse(req.body);
+    const vendor = await prisma.vendor.findFirst({
+      where: { id: payload.vendorId, orgId: DEFAULT_ORG_ID },
       select: { id: true }
     });
 
-    if (!customer) {
-      res.status(404).json({ error: { code: 'customer_not_found', message: 'Customer not found' } });
+    if (!vendor) {
+      res.status(404).json({ error: { code: 'vendor_not_found', message: 'Vendor not found' } });
       return;
     }
 
@@ -106,48 +99,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       }
     }
 
-    const productIds = payload.lines
-      .map((line) => line.productId)
-      .filter((value): value is string => Boolean(value));
-
-    const products = await prisma.product.findMany({
-      where: { orgId: DEFAULT_ORG_ID, id: { in: productIds } },
-      select: {
-        id: true,
-        incomeAccount: {
-          select: {
-            code: true
-          }
-        }
-      }
-    });
-
-    const productMap = new Map(
-      products.map((product) => [product.id, product])
-    );
-
-    for (const line of payload.lines) {
-      if (line.productId && !productMap.has(line.productId)) {
-        res.status(404).json({ error: { code: 'product_not_found', message: 'Product not found' } });
-        return;
-      }
-    }
-
-    const resolvedAccountCodes = payload.lines.map((line) => {
-      if (line.accountCode) {
-        return line.accountCode;
-      }
-
-      if (line.productId) {
-        const product = productMap.get(line.productId);
-        if (product?.incomeAccount?.code) {
-          return product.incomeAccount.code;
-        }
-      }
-
-      return ACCOUNT_CODES.SALES;
-    });
-
+    const resolvedAccountCodes = payload.lines.map((line) => line.accountCode ?? ACCOUNT_CODES.OPERATING_EXPENSES);
     const uniqueAccountCodes = Array.from(new Set(resolvedAccountCodes));
 
     const accountRecords =
@@ -175,17 +127,17 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const taxTotal = lineComputations.reduce((sum, line) => sum + line.taxAmount, 0);
     const total = subtotal + taxTotal;
 
-    const invoice = await prisma.$transaction(async (tx) => {
-      const invoiceNo = await getNextInvoiceNumber(tx);
-      const createdInvoice = await tx.invoice.create({
+    const bill = await prisma.$transaction(async (tx) => {
+      const billNo = await getNextBillNumber(tx);
+      const createdBill = await tx.bill.create({
         data: {
           orgId: DEFAULT_ORG_ID,
-          customerId: payload.customerId,
-          invoiceNo,
+          vendorId: payload.vendorId,
+          billNo,
           issueDate: new Date(payload.issueDate),
           dueDate: new Date(payload.dueDate),
           currency: payload.currency,
-          status: 'ISSUED',
+          status: 'APPROVED',
           subtotal,
           taxTotal,
           total,
@@ -196,89 +148,91 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
               quantity: line.quantity,
               unitPriceNet: line.unitPriceNet,
               taxRateId: line.taxRateId,
-              productId: line.productId,
               taxRatePercentSnapshot: lineComputations[index]?.taxRatePercent
             }))
           }
         },
         include: {
-          customer: {
+          vendor: {
             select: { id: true, name: true }
           }
         }
       });
 
-      const lines = [];
-      const accountsReceivableId = await requireAccountId(
+      const accountsPayableId = await requireAccountId(
         tx,
         DEFAULT_ORG_ID,
-        ACCOUNT_CODES.ACCOUNTS_RECEIVABLE
+        ACCOUNT_CODES.ACCOUNTS_PAYABLE
       );
-      const vatAccountId = await requireAccountId(tx, DEFAULT_ORG_ID, ACCOUNT_CODES.OUTPUT_VAT);
+      const inputVatAccountId = await requireAccountId(tx, DEFAULT_ORG_ID, ACCOUNT_CODES.INPUT_VAT);
 
-      if (total > 0) {
-        lines.push({
-          accountId: accountsReceivableId,
-          debit: total,
-          credit: 0
-        });
-      }
+      const journalLines = [];
 
-      const revenueTotals = new Map<string, number>();
+      const expenseTotals = new Map<string, number>();
       lineComputations.forEach((line, index) => {
         const accountCode = resolvedAccountCodes[index];
-        const current = revenueTotals.get(accountCode) ?? 0;
-        revenueTotals.set(accountCode, current + line.lineTotal);
+        const current = expenseTotals.get(accountCode) ?? 0;
+        expenseTotals.set(accountCode, current + line.lineTotal);
       });
 
-      for (const [accountCode, amount] of revenueTotals.entries()) {
+      for (const [accountCode, amount] of expenseTotals.entries()) {
         if (amount <= 0) {
           continue;
         }
+
         const accountId = accountIdByCode.get(accountCode);
         if (!accountId) {
           throw new Error(`Account ${accountCode} missing during journal creation`);
         }
-        lines.push({
+
+        journalLines.push({
           accountId,
-          debit: 0,
-          credit: amount
+          debit: amount,
+          credit: 0
         });
       }
 
       if (taxTotal > 0) {
-        lines.push({
-          accountId: vatAccountId,
-          debit: 0,
-          credit: taxTotal
+        journalLines.push({
+          accountId: inputVatAccountId,
+          debit: taxTotal,
+          credit: 0
         });
       }
 
-      if (lines.length > 0) {
+      if (total > 0) {
+        journalLines.push({
+          accountId: accountsPayableId,
+          debit: 0,
+          credit: total
+        });
+      }
+
+      if (journalLines.length > 0) {
         await tx.journalEntry.create({
           data: {
             orgId: DEFAULT_ORG_ID,
             date: new Date(payload.issueDate),
-            memo: `Invoice ${invoiceNo}`,
-            source: 'INVOICE',
-            sourceId: createdInvoice.id,
+            memo: `Bill ${billNo}`,
+            source: 'BILL',
+            sourceId: createdBill.id,
             lines: {
-              create: lines
+              create: journalLines
             }
           }
         });
       }
 
-      return createdInvoice;
+      return createdBill;
     });
 
-    res.status(201).json({ data: invoice });
+    res.status(201).json({ data: bill });
   } catch (error) {
     if (error instanceof ZodError) {
       res.status(422).json({
         error: {
           code: 'validation_error',
-          message: 'Invalid invoice data',
+          message: 'Invalid bill data',
           details: error.flatten()
         }
       });
@@ -289,4 +243,4 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-export const invoicesRouter = router;
+export const billsRouter = router;

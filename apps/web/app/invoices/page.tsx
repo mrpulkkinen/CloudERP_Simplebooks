@@ -14,6 +14,7 @@ interface Invoice {
   dueDate: string;
   currency: string;
   total: number;
+  balance: number;
   status: string;
   customer: InvoiceCustomer;
 }
@@ -26,6 +27,46 @@ interface CustomersResponse {
   data: Array<{ id: string; name: string }>;
 }
 
+interface TaxRate {
+  id: string;
+  name: string;
+  rate: string;
+}
+
+interface TaxRatesResponse {
+  data: TaxRate[];
+}
+
+interface Account {
+  code: string;
+  name: string;
+  type: string;
+}
+
+interface AccountsResponse {
+  data: Account[];
+}
+
+interface Product {
+  id: string;
+  name: string;
+  unitPriceNet: number;
+  incomeAccount?: {
+    code: string;
+    name: string;
+  } | null;
+  taxRate?: {
+    id: string;
+    name: string;
+  } | null;
+  incomeAccountCode?: string | null;
+  taxRateId?: string | null;
+}
+
+interface ProductsResponse {
+  data: Product[];
+}
+
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString('da-DK');
 }
@@ -33,16 +74,29 @@ function formatDate(value: string): string {
 export default async function InvoicesPage() {
   let invoices: Invoice[] = [];
   let customers: Array<{ id: string; name: string }> = [];
+  let taxRates: TaxRate[] = [];
+  let accounts: Account[] = [];
+  let products: Product[] = [];
   let loadError: string | null = null;
 
   try {
-    const [invoicesResponse, customersResponse] = await Promise.all([
+    const [invoicesResponse, customersResponse, taxRatesResponse, accountsResponse, productsResponse] = await Promise.all([
       apiFetch<InvoicesResponse>('/invoices'),
-      apiFetch<CustomersResponse>('/customers')
+      apiFetch<CustomersResponse>('/customers'),
+      apiFetch<TaxRatesResponse>('/tax-rates'),
+      apiFetch<AccountsResponse>('/accounts?type=INCOME'),
+      apiFetch<ProductsResponse>('/products')
     ]);
 
     invoices = invoicesResponse.data;
     customers = customersResponse.data;
+    taxRates = taxRatesResponse.data;
+    accounts = accountsResponse.data;
+    products = productsResponse.data.map((product) => ({
+      ...product,
+      incomeAccountCode: product.incomeAccount?.code ?? null,
+      taxRateId: product.taxRate?.id ?? null
+    }));
   } catch (error) {
     console.error('Failed to load invoices', error);
     loadError = 'Unable to load invoices from the API.';
@@ -65,6 +119,7 @@ export default async function InvoicesPage() {
                 <th>Issue Date</th>
                 <th>Due Date</th>
                 <th>Status</th>
+                <th>Balance</th>
                 <th>Total</th>
               </tr>
             </thead>
@@ -76,6 +131,7 @@ export default async function InvoicesPage() {
                   <td>{formatDate(invoice.issueDate)}</td>
                   <td>{formatDate(invoice.dueDate)}</td>
                   <td>{invoice.status}</td>
+                  <td>{formatDKK(invoice.balance)}</td>
                   <td>{formatDKK(invoice.total)}</td>
                 </tr>
               ))}
@@ -86,7 +142,7 @@ export default async function InvoicesPage() {
       <section className="card">
         <h2>Create invoice</h2>
         <p>Issue an invoice for a customer. Totals are calculated automatically.</p>
-        <NewInvoiceForm customers={customers} />
+        <NewInvoiceForm customers={customers} taxRates={taxRates} accounts={accounts} products={products} />
       </section>
     </div>
   );

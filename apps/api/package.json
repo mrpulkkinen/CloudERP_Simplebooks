@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.10.2",
+    "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
@@ -21,8 +22,7 @@
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "zod": "^3.22.4",
-    "bcrypt": "^5.1.1"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
@@ -38,6 +38,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-node": "^11.1.0",
+    "node-mocks-http": "^1.17.2",
     "prisma": "^5.10.2",
     "supertest": "^6.3.4",
     "ts-node": "^10.9.2",

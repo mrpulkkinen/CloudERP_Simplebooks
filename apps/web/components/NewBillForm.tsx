@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { formatDKK } from '../lib/money';
 
-interface CustomerOption {
+interface VendorOption {
   id: string;
   name: string;
 }
@@ -20,17 +20,8 @@ interface AccountOption {
   name: string;
 }
 
-interface ProductOption {
-  id: string;
-  name: string;
-  unitPriceNet: number;
-  taxRateId?: string | null;
-  incomeAccountCode?: string | null;
-}
-
 interface LineState {
   id: number;
-  productId: string;
   description: string;
   quantity: string;
   unitPrice: string;
@@ -39,7 +30,7 @@ interface LineState {
 }
 
 interface FormState {
-  customerId: string;
+  vendorId: string;
   issueDate: string;
   dueDate: string;
   lines: LineState[];
@@ -55,20 +46,14 @@ function defaultDueDate(issueDate: Date): Date {
   return due;
 }
 
-function formatOreToInputValue(ore: number): string {
-  return (ore / 100).toFixed(2);
-}
-
-export function NewInvoiceForm({
-  customers,
+export function NewBillForm({
+  vendors,
   taxRates,
-  accounts,
-  products
+  accounts
 }: {
-  customers: CustomerOption[];
+  vendors: VendorOption[];
   taxRates: TaxRateOption[];
   accounts: AccountOption[];
-  products: ProductOption[];
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -76,17 +61,16 @@ export function NewInvoiceForm({
 
   const initialState = useMemo<FormState>(() => {
     const today = new Date();
-    const firstCustomerId = customers[0]?.id ?? '';
+    const firstVendorId = vendors[0]?.id ?? '';
     const defaultTaxRate = taxRates[0]?.id ?? '';
     const defaultAccountCode = accounts[0]?.code ?? '';
     return {
-      customerId: firstCustomerId,
+      vendorId: firstVendorId,
       issueDate: toDateInputValue(today),
       dueDate: toDateInputValue(defaultDueDate(today)),
       lines: [
         {
           id: 0,
-          productId: '',
           description: '',
           quantity: '1',
           unitPrice: '',
@@ -95,22 +79,22 @@ export function NewInvoiceForm({
         }
       ]
     };
-  }, [customers, taxRates, accounts]);
+  }, [vendors, taxRates, accounts]);
 
   const [form, setForm] = useState<FormState>(initialState);
   const [lineCounter, setLineCounter] = useState(1);
 
   useEffect(() => {
-    if (customers.length === 0) {
-      setForm((current) => ({ ...current, customerId: '' }));
+    if (vendors.length === 0) {
+      setForm((current) => ({ ...current, vendorId: '' }));
       return;
     }
 
-    const hasCustomer = customers.some((customer) => customer.id === form.customerId);
-    if (!hasCustomer) {
-      setForm((current) => ({ ...current, customerId: customers[0]?.id ?? '' }));
+    const hasVendor = vendors.some((vendor) => vendor.id === form.vendorId);
+    if (!hasVendor) {
+      setForm((current) => ({ ...current, vendorId: vendors[0]?.id ?? '' }));
     }
-  }, [customers, form.customerId]);
+  }, [vendors, form.vendorId]);
 
   useEffect(() => {
     setForm((current) => ({
@@ -147,33 +131,6 @@ export function NewInvoiceForm({
     }));
   }
 
-  function applyProductToLine(id: number, productId: string) {
-    const product = products.find((item) => item.id === productId);
-    setForm((current) => ({
-      ...current,
-      lines: current.lines.map((line) => {
-        if (line.id !== id) {
-          return line;
-        }
-
-        if (!product) {
-          return { ...line, productId: '', description: line.description, unitPrice: line.unitPrice };
-        }
-
-        const updated: LineState = {
-          ...line,
-          productId,
-          description: product.name,
-          unitPrice: formatOreToInputValue(product.unitPriceNet),
-          accountCode: product.incomeAccountCode ?? line.accountCode,
-          taxRateId: product.taxRateId ?? line.taxRateId
-        };
-
-        return updated;
-      })
-    }));
-  }
-
   function addLine() {
     const defaultTaxRate = taxRates[0]?.id ?? '';
     const defaultAccountCode = accounts[0]?.code ?? '';
@@ -183,7 +140,6 @@ export function NewInvoiceForm({
         ...current.lines,
         {
           id: lineCounter,
-          productId: '',
           description: '',
           quantity: '1',
           unitPrice: '',
@@ -206,7 +162,6 @@ export function NewInvoiceForm({
           lines: [
             {
               id: lineCounter,
-              productId: '',
               description: '',
               quantity: '1',
               unitPrice: '',
@@ -225,13 +180,13 @@ export function NewInvoiceForm({
     event.preventDefault();
     setError(null);
 
-    if (customers.length === 0) {
-      setError('Add a customer before creating an invoice.');
+    if (vendors.length === 0) {
+      setError('Add a vendor before recording a bill.');
       return;
     }
 
-    if (!form.customerId) {
-      setError('Select a customer');
+    if (!form.vendorId) {
+      setError('Select a vendor');
       return;
     }
 
@@ -239,7 +194,7 @@ export function NewInvoiceForm({
 
     for (const line of form.lines) {
       if (!line.description.trim()) {
-        setError('Each line requires a description');
+        setError('Each line requires a description.');
         return;
       }
 
@@ -256,30 +211,28 @@ export function NewInvoiceForm({
       }
 
       const unitPriceNet = Math.round(unitPrice * 100);
-
       preparedLines.push({
         description: line.description.trim(),
         quantity,
         unitPriceNet,
         taxRateId: line.taxRateId || undefined,
-        accountCode: line.accountCode || undefined,
-        productId: line.productId || undefined
+        accountCode: line.accountCode || undefined
       });
     }
 
     if (preparedLines.length === 0) {
-      setError('Add at least one invoice line.');
+      setError('Add at least one bill line.');
       return;
     }
 
     try {
-      const response = await fetch('/api/invoices', {
+      const response = await fetch('/api/bills', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          customerId: form.customerId,
+          vendorId: form.vendorId,
           issueDate: form.issueDate,
           dueDate: form.dueDate,
           currency: 'DKK',
@@ -288,7 +241,7 @@ export function NewInvoiceForm({
       });
 
       if (!response.ok) {
-        let message = 'Failed to create invoice';
+        let message = 'Failed to create bill';
         try {
           const body = await response.json();
           message = body?.error?.message ?? message;
@@ -299,7 +252,7 @@ export function NewInvoiceForm({
         return;
       }
     } catch (networkError) {
-      console.error('Failed to submit invoice form', networkError);
+      console.error('Failed to submit bill form', networkError);
       setError('Unable to reach the API. Please try again.');
       return;
     }
@@ -310,26 +263,22 @@ export function NewInvoiceForm({
     });
   }
 
-  if (customers.length === 0) {
-    return <p>Create a customer before issuing an invoice.</p>;
+  if (vendors.length === 0) {
+    return <p>Create a vendor before recording a bill.</p>;
   }
 
   if (accounts.length === 0) {
-    return <p>Add at least one income account before issuing invoices.</p>;
+    return <p>Add at least one expense account before recording bills.</p>;
   }
 
   return (
     <form className="form" onSubmit={handleSubmit}>
       <label>
-        <span>Customer</span>
-        <select
-          value={form.customerId}
-          onChange={(event) => updateField('customerId', event.target.value)}
-          required
-        >
-          {customers.map((customer) => (
-            <option key={customer.id} value={customer.id}>
-              {customer.name}
+        <span>Vendor</span>
+        <select value={form.vendorId} onChange={(event) => updateField('vendorId', event.target.value)} required>
+          {vendors.map((vendor) => (
+            <option key={vendor.id} value={vendor.id}>
+              {vendor.name}
             </option>
           ))}
         </select>
@@ -353,30 +302,16 @@ export function NewInvoiceForm({
         />
       </label>
       <div>
-        <h3>Invoice lines</h3>
+        <h3>Bill lines</h3>
         {form.lines.map((line) => (
           <div key={line.id} className="line-item">
-            <label>
-              <span>Product</span>
-              <select
-                value={line.productId}
-                onChange={(event) => applyProductToLine(line.id, event.target.value)}
-              >
-                <option value="">Custom line</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
-            </label>
             <label>
               <span>Description</span>
               <input
                 type="text"
                 value={line.description}
                 onChange={(event) => updateLine(line.id, 'description', event.target.value)}
-                placeholder="Consulting services"
+                placeholder="Office supplies"
                 required
               />
             </label>
@@ -418,7 +353,7 @@ export function NewInvoiceForm({
               </select>
             </label>
             <label>
-              <span>Income account</span>
+              <span>Expense account</span>
               <select
                 value={line.accountCode}
                 onChange={(event) => updateLine(line.id, 'accountCode', event.target.value)}
@@ -431,11 +366,7 @@ export function NewInvoiceForm({
               </select>
             </label>
             {form.lines.length > 1 ? (
-              <button
-                type="button"
-                onClick={() => removeLine(line.id)}
-                aria-label="Remove line"
-              >
+              <button type="button" onClick={() => removeLine(line.id)}>
                 Remove line
               </button>
             ) : null}
@@ -445,10 +376,10 @@ export function NewInvoiceForm({
           Add line
         </button>
       </div>
-      {totalOre > 0 ? <p>Invoice total: {formatDKK(totalOre)}</p> : null}
+      {totalOre > 0 ? <p>Bill total: {formatDKK(totalOre)}</p> : null}
       {error ? <p style={{ color: '#b91c1c' }}>{error}</p> : null}
       <button type="submit" disabled={isPending}>
-        {isPending ? 'Creating…' : 'Create invoice'}
+        {isPending ? 'Saving…' : 'Record bill'}
       </button>
     </form>
   );

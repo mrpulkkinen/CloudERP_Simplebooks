@@ -1,0 +1,133 @@
+'use client';
+
+import { FormEvent, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface FormState {
+  name: string;
+  email: string;
+  phone: string;
+  vatNumber: string;
+  notes: string;
+}
+
+const initialState: FormState = {
+  name: '',
+  email: '',
+  phone: '',
+  vatNumber: '',
+  notes: ''
+};
+
+export function NewVendorForm() {
+  const router = useRouter();
+  const [form, setForm] = useState<FormState>(initialState);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function updateField<K extends keyof FormState>(field: K, value: string) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    if (!form.name.trim()) {
+      setError('Name is required');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/vendors', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+          vatNumber: form.vatNumber.trim() || undefined,
+          notes: form.notes.trim() || undefined
+        })
+      });
+
+      if (!response.ok) {
+        let message = 'Failed to create vendor';
+        try {
+          const body = await response.json();
+          message = body?.error?.message ?? message;
+        } catch (parseError) {
+          console.error('Failed to parse error response', parseError);
+        }
+        setError(message);
+        return;
+      }
+    } catch (networkError) {
+      console.error('Failed to submit vendor form', networkError);
+      setError('Unable to reach the API. Please try again.');
+      return;
+    }
+
+    setForm(initialState);
+    startTransition(() => {
+      router.refresh();
+    });
+  }
+
+  return (
+    <form className="form" onSubmit={handleSubmit}>
+      <label>
+        <span>Name</span>
+        <input
+          type="text"
+          value={form.name}
+          onChange={(event) => updateField('name', event.target.value)}
+          placeholder="e.g. Stationery Supply ApS"
+          required
+        />
+      </label>
+      <label>
+        <span>Email</span>
+        <input
+          type="email"
+          value={form.email}
+          onChange={(event) => updateField('email', event.target.value)}
+          placeholder="name@example.com"
+        />
+      </label>
+      <label>
+        <span>Phone</span>
+        <input
+          type="tel"
+          value={form.phone}
+          onChange={(event) => updateField('phone', event.target.value)}
+          placeholder="+45 87 65 43 21"
+        />
+      </label>
+      <label>
+        <span>VAT Number</span>
+        <input
+          type="text"
+          value={form.vatNumber}
+          onChange={(event) => updateField('vatNumber', event.target.value)}
+          placeholder="DK12345678"
+        />
+      </label>
+      <label>
+        <span>Notes</span>
+        <input
+          type="text"
+          value={form.notes}
+          onChange={(event) => updateField('notes', event.target.value)}
+          placeholder="Optional notes"
+        />
+      </label>
+      {error ? <p style={{ color: '#b91c1c' }}>{error}</p> : null}
+      <button type="submit" disabled={isPending}>
+        {isPending ? 'Saving…' : 'Create vendor'}
+      </button>
+    </form>
+  );
+}
