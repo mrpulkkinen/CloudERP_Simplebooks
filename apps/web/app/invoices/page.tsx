@@ -121,6 +121,7 @@ export default async function InvoicesPage() {
                 <th>Status</th>
                 <th>Balance</th>
                 <th>Total</th>
+                <th>PDF</th>
               </tr>
             </thead>
             <tbody>
@@ -133,6 +134,11 @@ export default async function InvoicesPage() {
                   <td>{invoice.status}</td>
                   <td>{formatDKK(invoice.balance)}</td>
                   <td>{formatDKK(invoice.total)}</td>
+                  <td>
+                    <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer">
+                      Download
+                    </a>
+                  </td>
                 </tr>
               ))}
             </tbody>

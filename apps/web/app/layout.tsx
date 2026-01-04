@@ -1,6 +1,9 @@
 import './globals.css';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
+
+import { LogoutButton } from '../components/LogoutButton';
 
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -16,6 +19,9 @@ const links = [
 ];
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const cookieStore = cookies();
+  const isAuthenticated = Boolean(cookieStore.get('sb_token'));
+
   return (
     <html lang="en">
       <body>
@@ -30,6 +36,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               ))}
             </ul>
           </nav>
+          <div className="auth-controls">
+            {isAuthenticated ? <LogoutButton /> : <Link href="/auth/login">Sign in</Link>}
+          </div>
         </header>
         <main className="app-main">{children}</main>
       </body>

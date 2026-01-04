@@ -1,15 +1,49 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    setMessage('Login flow not yet implemented.');
+    setError(null);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: email.trim(), password })
+      });
+
+      if (!response.ok) {
+        let message = 'Unable to sign in';
+        try {
+          const body = await response.json();
+          message = body?.error?.message ?? message;
+        } catch (parseError) {
+          console.error('Failed to parse login error', parseError);
+        }
+        setError(message);
+        return;
+      }
+    } catch (networkError) {
+      console.error('Failed to submit login form', networkError);
+      setError('Unable to reach the API. Please try again.');
+      return;
+    }
+
+    startTransition(() => {
+      router.push('/dashboard');
+      router.refresh();
+    });
   };
 
   return (
@@ -34,9 +68,11 @@ export default function LoginPage() {
             required
           />
         </label>
-        <button type="submit">Sign in</button>
+        {error ? <p style={{ color: '#b91c1c' }}>{error}</p> : null}
+        <button type="submit" disabled={isPending}>
+          {isPending ? 'Signing in…' : 'Sign in'}
+        </button>
       </form>
-      {message && <p>{message}</p>}
     </section>
   );
 }

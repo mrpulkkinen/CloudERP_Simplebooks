@@ -36,6 +36,19 @@ export async function forwardJson(request: NextRequest, path: string) {
 
     const responseText = await response.text();
     const contentType = response.headers.get('content-type') ?? '';
+
+    const applySetCookie = (nextResponse: NextResponse) => {
+      const getSetCookie =
+        (response.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() ??
+        (response.headers.get('set-cookie') ? [response.headers.get('set-cookie') as string] : []);
+
+      for (const cookie of getSetCookie ?? []) {
+        nextResponse.headers.append('set-cookie', cookie);
+      }
+
+      return nextResponse;
+    };
+
     const parseJson = () => {
       try {
         return responseText.length > 0 ? JSON.parse(responseText) : null;
@@ -49,35 +62,43 @@ export async function forwardJson(request: NextRequest, path: string) {
       if (contentType.includes('application/json')) {
         const json = parseJson();
         if (json !== null) {
-          return NextResponse.json(json, {
-            status: response.status
-          });
+          return applySetCookie(
+            NextResponse.json(json, {
+              status: response.status
+            })
+          );
         }
       }
 
-      return new NextResponse(responseText, {
-        status: response.status,
-        headers: contentType ? { 'content-type': contentType } : undefined
-      });
+      return applySetCookie(
+        new NextResponse(responseText, {
+          status: response.status,
+          headers: contentType ? { 'content-type': contentType } : undefined
+        })
+      );
     }
 
     if (!responseText) {
-      return new NextResponse(null, { status: response.status });
+      return applySetCookie(new NextResponse(null, { status: response.status }));
     }
 
     if (contentType.includes('application/json')) {
       const json = parseJson();
       if (json !== null) {
-        return NextResponse.json(json, {
-          status: response.status
-        });
+        return applySetCookie(
+          NextResponse.json(json, {
+            status: response.status
+          })
+        );
       }
     }
 
-    return new NextResponse(responseText, {
-      status: response.status,
-      headers: contentType ? { 'content-type': contentType } : undefined
-    });
+    return applySetCookie(
+      new NextResponse(responseText, {
+        status: response.status,
+        headers: contentType ? { 'content-type': contentType } : undefined
+      })
+    );
   } catch (error) {
     console.error('Failed to forward request to API', error);
     return NextResponse.json(

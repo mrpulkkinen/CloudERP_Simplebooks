@@ -93,6 +93,7 @@ export default async function BillsPage() {
                 <th>Status</th>
                 <th>Balance</th>
                 <th>Total</th>
+                <th>PDF</th>
               </tr>
             </thead>
             <tbody>
@@ -105,6 +106,11 @@ export default async function BillsPage() {
                   <td>{bill.status}</td>
                   <td>{formatDKK(bill.balance)}</td>
                   <td>{formatDKK(bill.total)}</td>
+                  <td>
+                    <a href={`/api/bills/${bill.id}/pdf`} target="_blank" rel="noreferrer">
+                      Download
+                    </a>
+                  </td>
                 </tr>
               ))}
             </tbody>

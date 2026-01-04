@@ -10,6 +10,8 @@ import { reportsRouter } from './reports.js';
 import { taxRatesRouter } from './tax-rates.js';
 import { productsRouter } from './products.js';
 import { accountsRouter } from './accounts.js';
+import { authRouter } from './auth.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export function registerRoutes(app: Application) {
   app.get('/', (_req: Request, res: Response) => {
@@ -32,16 +34,18 @@ export function registerRoutes(app: Application) {
     res.status(501).json({ error: { code: 'not_implemented', message: 'Coming soon' } });
   };
 
-  app.use('/customers', customersRouter);
-  app.use('/vendors', vendorsRouter);
-  app.use('/products', productsRouter);
-  app.use('/tax-rates', taxRatesRouter);
-  app.use('/sales-orders', notImplemented);
-  app.use('/invoices', invoicesRouter);
-  app.use('/bills', billsRouter);
-  app.use('/payments', paymentsRouter);
-  app.use('/journals', notImplemented);
-  app.use('/ledger', ledgerRouter);
-  app.use('/reports', reportsRouter);
-  app.use('/accounts', accountsRouter);
+  app.use('/auth', authRouter);
+
+  app.use('/customers', requireAuth, customersRouter);
+  app.use('/vendors', requireAuth, vendorsRouter);
+  app.use('/products', requireAuth, productsRouter);
+  app.use('/tax-rates', requireAuth, taxRatesRouter);
+  app.use('/sales-orders', requireAuth, notImplemented);
+  app.use('/invoices', requireAuth, invoicesRouter);
+  app.use('/bills', requireAuth, billsRouter);
+  app.use('/payments', requireAuth, paymentsRouter);
+  app.use('/journals', requireAuth, notImplemented);
+  app.use('/ledger', requireAuth, ledgerRouter);
+  app.use('/reports', requireAuth, reportsRouter);
+  app.use('/accounts', requireAuth, accountsRouter);
 }

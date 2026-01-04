@@ -5,6 +5,7 @@ import { prisma } from '../services/prisma.js';
 import { loadEnv } from '../config/env.js';
 import { ACCOUNT_CODES, requireAccountId } from '../services/accounts.js';
 import { computeLineTotals, loadTaxRateMap } from '../services/totals.js';
+import { streamBillPdf } from '../services/pdf.js';
 
 const router = Router();
 const { DEFAULT_ORG_ID } = loadEnv();
@@ -69,6 +70,29 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
     });
 
     res.json({ data: bills });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/pdf', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bill = await prisma.bill.findFirst({
+      where: { id: req.params.id, orgId: DEFAULT_ORG_ID },
+      include: {
+        vendor: {
+          select: { name: true, email: true }
+        },
+        lines: true
+      }
+    });
+
+    if (!bill) {
+      res.status(404).json({ error: { code: 'bill_not_found', message: 'Bill not found' } });
+      return;
+    }
+
+    streamBillPdf(bill, res);
   } catch (error) {
     next(error);
   }

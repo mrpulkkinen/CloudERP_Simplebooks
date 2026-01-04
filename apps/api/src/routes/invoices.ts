@@ -5,6 +5,7 @@ import { prisma } from '../services/prisma.js';
 import { loadEnv } from '../config/env.js';
 import { ACCOUNT_CODES, requireAccountId } from '../services/accounts.js';
 import { computeLineTotals, loadTaxRateMap } from '../services/totals.js';
+import { streamInvoicePdf } from '../services/pdf.js';
 
 const router = Router();
 const { DEFAULT_ORG_ID } = loadEnv();
@@ -76,6 +77,32 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
     });
 
     res.json({ data: invoices });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/pdf', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: req.params.id, orgId: DEFAULT_ORG_ID },
+      include: {
+        customer: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        lines: true
+      }
+    });
+
+    if (!invoice) {
+      res.status(404).json({ error: { code: 'invoice_not_found', message: 'Invoice not found' } });
+      return;
+    }
+
+    streamInvoicePdf(invoice, res);
   } catch (error) {
     next(error);
   }
