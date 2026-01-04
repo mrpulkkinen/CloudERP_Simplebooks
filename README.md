@@ -19,6 +19,10 @@ development.
 2. Run `docker compose up --build` to start Postgres, the API, and the web app.
 3. Access the web UI at http://localhost:3000 and the API at
    http://localhost:5010.
+4. Sign in at http://localhost:3000/auth/login with the seeded owner account
+   `owner@example.com` / `demo1234` (created via `npm run prisma:seed --workspace apps/api`).
+   Custom environments must define `JWT_SECRET` (see `.env.example`) so auth
+   tokens can be issued.
 
 ## Local development
 
@@ -33,4 +37,3 @@ Useful commands:
 - `npm run dev --workspace apps/api` – Start the API in watch mode.
 - `npm run dev --workspace apps/web` – Start the Next.js dev server.
 - `npm run test --workspace apps/api` – Run API unit tests (Vitest).
-
