@@ -24,6 +24,22 @@ development.
    Custom environments must define `JWT_SECRET` (see `.env.example`) so auth
    tokens can be issued.
 
+## Install & Deployment
+
+1. Install dependencies once: `npm install`.
+2. Copy `.env.example` to `.env` and edit values (at minimum set `DATABASE_URL`
+   and `JWT_SECRET` before building).
+3. Generate the Prisma client: `npm run prisma:generate --workspace apps/api`.
+4. Run migrations against your database: `npm run prisma:migrate --workspace apps/api`.
+5. Seed demo data (optional but useful for first-run login):
+   `npm run prisma:seed --workspace apps/api`.
+6. Build the workspaces: `npm run build`.
+7. Deploy via Docker Compose locally (`docker compose up --build`) or ship the
+   built containers/images to your target environment. The API container
+   expects the same env vars listed in `.env.example`; the web container needs
+   `NEXT_PUBLIC_API_URL` (and optionally `INTERNAL_API_URL` when proxying at
+   runtime).
+
 ## Local development
 
 Install dependencies once from the repository root:
