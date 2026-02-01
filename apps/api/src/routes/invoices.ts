@@ -1,14 +1,16 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { ZodError, z } from 'zod';
 
 import { prisma } from '../services/prisma.js';
-import { loadEnv } from '../config/env.js';
 import { ACCOUNT_CODES, requireAccountId } from '../services/accounts.js';
 import { computeLineTotals, loadTaxRateMap } from '../services/totals.js';
 import { streamInvoicePdf } from '../services/pdf.js';
+import { AuthenticatedRequest } from '../middleware/auth.js';
+import { getRequestOrgId } from '../services/org.js';
+import { formatSequence, getNextSequenceValue } from '../services/sequences.js';
+import { recordAuditLog } from '../services/audit-log.js';
 
 const router = Router();
-const { DEFAULT_ORG_ID } = loadEnv();
 
 const isoDateSchema = z
   .string()
@@ -55,16 +57,11 @@ const createInvoiceSchema = z
     }
   });
 
-async function getNextInvoiceNumber(client = prisma): Promise<string> {
-  const count = await client.invoice.count({ where: { orgId: DEFAULT_ORG_ID } });
-  const sequence = count + 1;
-  return `INV-${sequence.toString().padStart(4, '0')}`;
-}
-
-router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    const orgId = getRequestOrgId(req);
     const invoices = await prisma.invoice.findMany({
-      where: { orgId: DEFAULT_ORG_ID },
+      where: { orgId },
       orderBy: { issueDate: 'desc' },
       include: {
         customer: {
@@ -82,10 +79,11 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.get('/:id/pdf', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id/pdf', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    const orgId = getRequestOrgId(req);
     const invoice = await prisma.invoice.findFirst({
-      where: { id: req.params.id, orgId: DEFAULT_ORG_ID },
+      where: { id: req.params.id, orgId },
       include: {
         customer: {
           select: {
@@ -108,11 +106,12 @@ router.get('/:id/pdf', async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const payload = createInvoiceSchema.parse(req.body);
+    const orgId = getRequestOrgId(req);
     const customer = await prisma.customer.findFirst({
-      where: { id: payload.customerId, orgId: DEFAULT_ORG_ID },
+      where: { id: payload.customerId, orgId },
       select: { id: true }
     });
 
@@ -124,7 +123,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const taxRateIds = payload.lines
       .map((line) => line.taxRateId)
       .filter((value): value is string => Boolean(value));
-    const taxRateMap = await loadTaxRateMap(taxRateIds);
+    const taxRateMap = await loadTaxRateMap(taxRateIds, orgId);
 
     for (const line of payload.lines) {
       if (line.taxRateId && !taxRateMap.has(line.taxRateId)) {
@@ -138,7 +137,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       .filter((value): value is string => Boolean(value));
 
     const products = await prisma.product.findMany({
-      where: { orgId: DEFAULT_ORG_ID, id: { in: productIds } },
+      where: { orgId, id: { in: productIds } },
       select: {
         id: true,
         incomeAccount: {
@@ -181,7 +180,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       uniqueAccountCodes.length === 0
         ? []
         : await prisma.account.findMany({
-            where: { orgId: DEFAULT_ORG_ID, code: { in: uniqueAccountCodes } },
+            where: { orgId, code: { in: uniqueAccountCodes } },
             select: { id: true, code: true }
           });
 
@@ -203,10 +202,11 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const total = subtotal + taxTotal;
 
     const invoice = await prisma.$transaction(async (tx) => {
-      const invoiceNo = await getNextInvoiceNumber(tx);
+      const sequenceValue = await getNextSequenceValue(tx, orgId, 'invoice');
+      const invoiceNo = formatSequence('INV', sequenceValue);
       const createdInvoice = await tx.invoice.create({
         data: {
-          orgId: DEFAULT_ORG_ID,
+          orgId,
           customerId: payload.customerId,
           invoiceNo,
           issueDate: new Date(payload.issueDate),
@@ -236,12 +236,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       });
 
       const lines = [];
-      const accountsReceivableId = await requireAccountId(
-        tx,
-        DEFAULT_ORG_ID,
-        ACCOUNT_CODES.ACCOUNTS_RECEIVABLE
-      );
-      const vatAccountId = await requireAccountId(tx, DEFAULT_ORG_ID, ACCOUNT_CODES.OUTPUT_VAT);
+      const accountsReceivableId = await requireAccountId(tx, orgId, ACCOUNT_CODES.ACCOUNTS_RECEIVABLE);
+      const vatAccountId = await requireAccountId(tx, orgId, ACCOUNT_CODES.OUTPUT_VAT);
 
       if (total > 0) {
         lines.push({
@@ -284,7 +280,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       if (lines.length > 0) {
         await tx.journalEntry.create({
           data: {
-            orgId: DEFAULT_ORG_ID,
+            orgId,
             date: new Date(payload.issueDate),
             memo: `Invoice ${invoiceNo}`,
             source: 'INVOICE',
@@ -297,6 +293,22 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       }
 
       return createdInvoice;
+    });
+
+    await recordAuditLog({
+      orgId,
+      userId: req.user?.userId,
+      entityType: 'invoice',
+      entityId: invoice.id,
+      action: 'create',
+      context: {
+        invoiceNo: invoice.invoiceNo,
+        customerId: invoice.customerId,
+        issueDate: invoice.issueDate.toISOString(),
+        dueDate: invoice.dueDate.toISOString(),
+        total: invoice.total,
+        currency: invoice.currency
+      }
     });
 
     res.status(201).json({ data: invoice });
@@ -312,6 +324,82 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
+    next(error);
+  }
+});
+
+router.post('/:id/void', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getRequestOrgId(req);
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: req.params.id, orgId },
+      select: {
+        id: true,
+        invoiceNo: true,
+        status: true,
+        total: true,
+        balance: true
+      }
+    });
+
+    if (!invoice) {
+      res.status(404).json({ error: { code: 'invoice_not_found', message: 'Invoice not found' } });
+      return;
+    }
+
+    if (invoice.status === 'VOID') {
+      res.status(409).json({
+        error: { code: 'invoice_already_void', message: 'Invoice already voided' }
+      });
+      return;
+    }
+
+    if (invoice.balance !== invoice.total) {
+      res.status(409).json({
+        error: {
+          code: 'invoice_has_payments',
+          message: 'Invoices with payments cannot be voided'
+        }
+      });
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const journal = await tx.journalEntry.findFirst({
+        where: { orgId, source: 'INVOICE', sourceId: invoice.id },
+        include: { lines: true }
+      });
+
+      if (journal) {
+        await tx.journalEntry.create({
+          data: {
+            orgId,
+            date: new Date(),
+            memo: `Void invoice ${invoice.invoiceNo}`,
+            source: 'VOID',
+            sourceId: invoice.id,
+            lines: {
+              create: journal.lines.map((line) => ({
+                accountId: line.accountId,
+                debit: line.credit,
+                credit: line.debit
+              }))
+            }
+          }
+        });
+      }
+
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: 'VOID',
+          balance: 0
+        }
+      });
+    });
+
+    res.status(200).json({ data: { id: invoice.id, status: 'VOID' } });
+  } catch (error) {
     next(error);
   }
 });

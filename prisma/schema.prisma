@@ -74,7 +74,9 @@ model Organization {
   payments     Payment[]
   accounts     Account[]
   journal      JournalEntry[]
+  numberSequences NumberSequence[]
   users        UserOrganization[]
+  auditLogs    AuditLog[]
 }
 
 model User {
@@ -85,6 +87,7 @@ model User {
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
   orgs      UserOrganization[]
+  auditLogs AuditLog[]
 }
 
 model UserOrganization {
@@ -168,6 +171,22 @@ model TaxRate {
   soLines   SalesOrderLine[]
   invoiceLines InvoiceLine[]
   billLines BillLine[]
+}
+
+model AuditLog {
+  id         String        @id @default(cuid())
+  org        Organization  @relation(fields: [orgId], references: [id])
+  orgId      String
+  user       User?         @relation(fields: [userId], references: [id])
+  userId     String?
+  entityType String
+  entityId   String
+  action     String
+  context    Json?
+  createdAt  DateTime      @default(now())
+
+  @@index([orgId, entityType, entityId])
+  @@index([orgId, createdAt])
 }
 
 model SalesOrder {
@@ -362,3 +381,14 @@ model JournalLine {
   credit        Int           @default(0)
 }
 
+model NumberSequence {
+  id        String        @id @default(cuid())
+  org       Organization  @relation(fields: [orgId], references: [id])
+  orgId     String
+  key       String
+  nextNumber Int          @default(1)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([orgId, key])
+}
